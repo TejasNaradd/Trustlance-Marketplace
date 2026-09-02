@@ -1,0 +1,19 @@
+server:
+  port: 8085
+
+spring:
+  datasource:
+    url: jdbc:mysql://:/escrow_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: 
+    password: 
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+  data:
+    redis:
+      host: 
+      port: 
+  kafka:
+    bootstrap-servers: 

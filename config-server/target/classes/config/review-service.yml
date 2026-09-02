@@ -1,0 +1,9 @@
+server:
+  port: 8086
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://:@:/review_db?authSource=admin
+  kafka:
+    bootstrap-servers: 

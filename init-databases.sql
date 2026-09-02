@@ -1,0 +1,6 @@
+-- MySQL init script: create all databases
+CREATE DATABASE IF NOT EXISTS user_db;
+CREATE DATABASE IF NOT EXISTS marketplace_db;
+CREATE DATABASE IF NOT EXISTS contract_db;
+CREATE DATABASE IF NOT EXISTS payment_db;
+CREATE DATABASE IF NOT EXISTS escrow_db;

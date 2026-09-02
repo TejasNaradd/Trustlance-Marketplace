@@ -1,0 +1,12 @@
+server:
+  port: 8088
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://:@:/notification_db?authSource=admin
+  kafka:
+    bootstrap-servers: 
+    consumer:
+      group-id: notification-group
+      auto-offset-reset: earliest
