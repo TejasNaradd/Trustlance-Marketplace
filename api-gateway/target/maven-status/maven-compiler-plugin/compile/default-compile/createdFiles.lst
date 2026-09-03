@@ -1,5 +1,0 @@
-com\trustlance\apigateway\filter\CorrelationIdFilter.class
-com\trustlance\apigateway\security\SecurityConfig.class
-com\trustlance\apigateway\config\RateLimiterConfig.class
-com\trustlance\apigateway\ApiGatewayApplication.class
-com\trustlance\apigateway\security\JwtAuthFilter.class

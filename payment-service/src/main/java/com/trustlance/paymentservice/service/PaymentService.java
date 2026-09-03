@@ -12,6 +12,7 @@ import com.trustlance.paymentservice.repository.PaymentIntentRepository;
 import com.trustlance.paymentservice.repository.WebhookEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -30,6 +31,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class PaymentService {
+
+    @Value("${trustlance.payment.webhook-secret}")
+    private String webhookSecret;
 
     private final PaymentIntentRepository paymentIntentRepository;
     private final WebhookEventRepository webhookEventRepository;
@@ -98,7 +102,7 @@ public class PaymentService {
         PaymentProvider provider = getProvider(providerName);
 
         // 1. Verify signature — authoritative proof from provider
-        provider.verifyWebhookSignature(rawPayload, signature, "webhook_secret_from_config");
+        provider.verifyWebhookSignature(rawPayload, signature, webhookSecret);
 
         // 2. Extract event data
         PaymentProvider.WebhookEventData eventData = provider.extractEventData(rawPayload);

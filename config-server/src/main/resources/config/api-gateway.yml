@@ -9,47 +9,142 @@ spring:
           enabled: false
           lower-case-service-id: true
       routes:
+        # ─── Business API Routes ─────────────────────────────────────────────────
         - id: user-service-auth
           uri: lb://user-service
           predicates:
             - Path=/api/v1/auth/**
+
         - id: user-service-users
           uri: lb://user-service
           predicates:
             - Path=/api/v1/users/**, /api/v1/admin/users/**
+
         - id: marketplace-service
           uri: lb://marketplace-service
           predicates:
             - Path=/api/v1/services/**, /api/v1/categories/**
+
         - id: contract-service
           uri: lb://contract-service
           predicates:
             - Path=/api/v1/contracts/**, /api/v1/milestones/**
+
         - id: payment-service
           uri: lb://payment-service
           predicates:
             - Path=/api/v1/payments/**
+
         - id: escrow-service
           uri: lb://escrow-service
           predicates:
             - Path=/api/v1/escrow/**
+
         - id: review-service
           uri: lb://review-service
           predicates:
             - Path=/api/v1/reviews/**
+
         - id: dispute-service
           uri: lb://dispute-service
           predicates:
             - Path=/api/v1/disputes/**, /api/v1/admin/disputes/**
+
         - id: notification-service
           uri: lb://notification-service
           predicates:
             - Path=/api/v1/notifications/**
+
         - id: ai-service
           uri: lb://ai-service
           predicates:
             - Path=/api/v1/ai/**
+
+        # ─── Swagger UI Routes (direct per-service access) ───────────────────────
+        - id: user-service-swagger-ui
+          uri: lb://user-service
+          predicates:
+            - Path=/swagger/user-service/swagger-ui.html, /swagger/user-service/swagger-ui/**, /swagger/user-service/v3/api-docs/**
+          filters:
+            - RewritePath=/swagger/user-service/(?<segment>.*), /${segment}
+
+        - id: marketplace-service-swagger-ui
+          uri: lb://marketplace-service
+          predicates:
+            - Path=/swagger/marketplace-service/swagger-ui.html, /swagger/marketplace-service/swagger-ui/**, /swagger/marketplace-service/v3/api-docs/**
+          filters:
+            - RewritePath=/swagger/marketplace-service/(?<segment>.*), /${segment}
+
+        - id: contract-service-swagger-ui
+          uri: lb://contract-service
+          predicates:
+            - Path=/swagger/contract-service/swagger-ui.html, /swagger/contract-service/swagger-ui/**, /swagger/contract-service/v3/api-docs/**
+          filters:
+            - RewritePath=/swagger/contract-service/(?<segment>.*), /${segment}
+
+        - id: payment-service-swagger-ui
+          uri: lb://payment-service
+          predicates:
+            - Path=/swagger/payment-service/swagger-ui.html, /swagger/payment-service/swagger-ui/**, /swagger/payment-service/v3/api-docs/**
+          filters:
+            - RewritePath=/swagger/payment-service/(?<segment>.*), /${segment}
+
+        - id: escrow-service-swagger-ui
+          uri: lb://escrow-service
+          predicates:
+            - Path=/swagger/escrow-service/swagger-ui.html, /swagger/escrow-service/swagger-ui/**, /swagger/escrow-service/v3/api-docs/**
+          filters:
+            - RewritePath=/swagger/escrow-service/(?<segment>.*), /${segment}
+
+        - id: review-service-swagger-ui
+          uri: lb://review-service
+          predicates:
+            - Path=/swagger/review-service/swagger-ui.html, /swagger/review-service/swagger-ui/**, /swagger/review-service/v3/api-docs/**
+          filters:
+            - RewritePath=/swagger/review-service/(?<segment>.*), /${segment}
+
+        - id: dispute-service-swagger-ui
+          uri: lb://dispute-service
+          predicates:
+            - Path=/swagger/dispute-service/swagger-ui.html, /swagger/dispute-service/swagger-ui/**, /swagger/dispute-service/v3/api-docs/**
+          filters:
+            - RewritePath=/swagger/dispute-service/(?<segment>.*), /${segment}
+
+        - id: notification-service-swagger-ui
+          uri: lb://notification-service
+          predicates:
+            - Path=/swagger/notification-service/swagger-ui.html, /swagger/notification-service/swagger-ui/**, /swagger/notification-service/v3/api-docs/**
+          filters:
+            - RewritePath=/swagger/notification-service/(?<segment>.*), /${segment}
+
+        - id: ai-service-swagger-ui
+          uri: lb://ai-service
+          predicates:
+            - Path=/swagger/ai-service/swagger-ui.html, /swagger/ai-service/swagger-ui/**, /swagger/ai-service/v3/api-docs/**
+          filters:
+            - RewritePath=/swagger/ai-service/(?<segment>.*), /${segment}
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+trustlance:
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

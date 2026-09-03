@@ -4,9 +4,49 @@ server:
 spring:
   data:
     mongodb:
-      uri: mongodb://:@:/notification_db?authSource=admin
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://localhost:27017/notification_db}
   kafka:
-    bootstrap-servers: 
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
-      group-id: notification-group
+      group-id: notification-service-group
       auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.trustlance.*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  # Spring Mail — used by SmtpEmailProvider when SMTP_ENABLED=true
+  mail:
+    host: ${SMTP_HOST:smtp.gmail.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+trustlance:
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  notification:
+    email:
+      enabled: ${SMTP_ENABLED:false}
+      from: ${SMTP_FROM:noreply@trustlance.com}
+
+logging:
+  level:
+    com.trustlance.notificationservice: INFO
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+  api-docs:
+    path: /v3/api-docs
+    enabled: true

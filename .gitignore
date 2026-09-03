@@ -1,0 +1,82 @@
+# =========================
+# Maven
+# =========================
+**/target/
+**/*.jar
+**/*.war
+
+# Maven Wrapper
+# Keep .mvn/, mvnw and mvnw.cmd
+# Do NOT ignore them
+
+
+# =========================
+# Environment / Secrets
+# =========================
+.env
+.env.*
+!.env.example
+
+# Local Spring configuration
+**/application-local.yml
+**/application-local.yaml
+**/application-local.properties
+
+
+# =========================
+# IntelliJ IDEA
+# =========================
+.idea/
+*.iml
+*.iws
+*.ipr
+
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+
+# =========================
+# Eclipse
+# =========================
+.classpath
+.project
+.settings/
+
+
+# =========================
+# Java
+# =========================
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
+
+# =========================
+# OS Generated Files
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+
+# =========================
+# Docker
+# =========================
+# Do NOT ignore Dockerfile or docker-compose.yml
+
+# Local Docker overrides
+docker-compose.override.yml
+
+
+# =========================
+# Temporary / Generated
+# =========================
+*.tmp
+*.temp
+*.swp
+*.swo
+*~

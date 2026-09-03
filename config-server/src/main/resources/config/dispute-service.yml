@@ -4,6 +4,25 @@ server:
 spring:
   data:
     mongodb:
-      uri: mongodb://:@:/dispute_db?authSource=admin
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://localhost:27017/dispute_db}
   kafka:
-    bootstrap-servers: 
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+trustlance:
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+
+logging:
+  level:
+    com.trustlance.disputeservice: INFO
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+  api-docs:
+    path: /v3/api-docs
+    enabled: true

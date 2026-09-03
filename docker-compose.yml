@@ -10,6 +10,9 @@ volumes:
   minio-data:
 
 services:
+
+  # ─── Infrastructure ──────────────────────────────────────────────────────────
+
   mysql:
     image: mysql:8.0
     container_name: mysql
@@ -21,6 +24,12 @@ services:
       - ./init-databases.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - trustlance-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prcoem"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   mongodb:
     image: mongo:8.0
@@ -30,6 +39,12 @@ services:
       - mongodb-data:/data/db
     networks:
       - trustlance-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   redis:
     image: redis:7-alpine
@@ -37,6 +52,11 @@ services:
     restart: unless-stopped
     networks:
       - trustlance-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   kafka:
     image: apache/kafka:4.3.0
@@ -53,8 +73,15 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     networks:
       - trustlance-network
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
 
   minio:
     image: minio/minio:latest
@@ -71,6 +98,13 @@ services:
       - minio-data:/data
     networks:
       - trustlance-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Platform Services ───────────────────────────────────────────────────────
 
   config-server:
     build:
@@ -83,6 +117,12 @@ services:
       - "8888:8888"
     networks:
       - trustlance-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   eureka-server:
     build:
@@ -94,11 +134,18 @@ services:
     ports:
       - "8761:8761"
     depends_on:
-      - config-server
+      config-server:
+        condition: service_healthy
     environment:
       CONFIG_SERVER_URL: http://config-server:8888
     networks:
       - trustlance-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   api-gateway:
     build:
@@ -110,15 +157,20 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - config-server
-      - eureka-server
-      - redis
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       CONFIG_SERVER_URL: http://config-server:8888
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
       SPRING_DATA_REDIS_HOST: redis
     networks:
       - trustlance-network
+
+  # ─── Business Services ───────────────────────────────────────────────────────
 
   user-service:
     build:
@@ -128,17 +180,27 @@ services:
     container_name: user-service
     restart: unless-stopped
     depends_on:
-      - mysql
-      - kafka
-      - config-server
-      - eureka-server
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
     environment:
       CONFIG_SERVER_URL: http://config-server:8888
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_db
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: rcoem
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      MYSQL_HOST: mysql
+      MYSQL_USER: root
+      MYSQL_PASSWORD: rcoem
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@trustlance.com}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@1234}
+      ADMIN_FIRSTNAME: ${ADMIN_FIRSTNAME:-Platform}
+      ADMIN_LASTNAME: ${ADMIN_LASTNAME:-Admin}
     networks:
       - trustlance-network
 
@@ -150,19 +212,22 @@ services:
     container_name: marketplace-service
     restart: unless-stopped
     depends_on:
-      - mysql
-      - kafka
-      - redis
-      - config-server
-      - eureka-server
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
     environment:
       CONFIG_SERVER_URL: http://config-server:8888
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/marketplace_db
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: rcoem
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/marketplace_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      MYSQL_HOST: mysql
+      MYSQL_USER: root
+      MYSQL_PASSWORD: rcoem
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     networks:
       - trustlance-network
 
@@ -174,17 +239,22 @@ services:
     container_name: contract-service
     restart: unless-stopped
     depends_on:
-      - mysql
-      - kafka
-      - config-server
-      - eureka-server
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
     environment:
       CONFIG_SERVER_URL: http://config-server:8888
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/contract_db
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: rcoem
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: rcoem
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     networks:
       - trustlance-network
 
@@ -196,19 +266,23 @@ services:
     container_name: payment-service
     restart: unless-stopped
     depends_on:
-      - mysql
-      - kafka
-      - redis
-      - config-server
-      - eureka-server
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
     environment:
       CONFIG_SERVER_URL: http://config-server:8888
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/payment_db
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: rcoem
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: rcoem
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-dev-webhook-secret}
     networks:
       - trustlance-network
 
@@ -220,19 +294,26 @@ services:
     container_name: escrow-service
     restart: unless-stopped
     depends_on:
-      - mysql
-      - kafka
-      - redis
-      - config-server
-      - eureka-server
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
     environment:
       CONFIG_SERVER_URL: http://config-server:8888
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/escrow_db
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: rcoem
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: rcoem
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     networks:
       - trustlance-network
 
@@ -244,15 +325,19 @@ services:
     container_name: review-service
     restart: unless-stopped
     depends_on:
-      - mongodb
-      - kafka
-      - config-server
-      - eureka-server
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
     environment:
       CONFIG_SERVER_URL: http://config-server:8888
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/review_db
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     networks:
       - trustlance-network
 
@@ -264,15 +349,19 @@ services:
     container_name: dispute-service
     restart: unless-stopped
     depends_on:
-      - mongodb
-      - kafka
-      - config-server
-      - eureka-server
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
     environment:
       CONFIG_SERVER_URL: http://config-server:8888
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/dispute_db
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     networks:
       - trustlance-network
 
@@ -284,15 +373,25 @@ services:
     container_name: notification-service
     restart: unless-stopped
     depends_on:
-      - mongodb
-      - kafka
-      - config-server
-      - eureka-server
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
     environment:
       CONFIG_SERVER_URL: http://config-server:8888
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/notification_db
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SMTP_ENABLED: "false"
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USERNAME: ""
+      SMTP_PASSWORD: ""
+      SMTP_FROM: noreply@trustlance.com
     networks:
       - trustlance-network
 
@@ -304,18 +403,24 @@ services:
     container_name: ai-service
     restart: unless-stopped
     depends_on:
-      - mongodb
-      - kafka
-      - minio
-      - config-server
-      - eureka-server
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
     environment:
       CONFIG_SERVER_URL: http://config-server:8888
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/ai_db
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     networks:
       - trustlance-network

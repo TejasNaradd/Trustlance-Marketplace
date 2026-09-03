@@ -1,6 +1,7 @@
 package com.trustlance.escrowservice.service;
 
 import com.trustlance.escrowservice.config.UserPrincipal;
+import com.trustlance.escrowservice.dto.DisputeEvent;
 import com.trustlance.escrowservice.dto.EscrowResponse;
 import com.trustlance.escrowservice.dto.PaymentEvent;
 import com.trustlance.escrowservice.event.EscrowEvent;
@@ -42,7 +43,8 @@ public class EscrowService {
 
     // ─── Kafka Consumer ───────────────────────────────────────────────────────────
 
-    @KafkaListener(topics = "payment-events", groupId = "escrow-group")
+    @KafkaListener(topics = "payment-events", groupId = "escrow-group",
+            containerFactory = "paymentEventKafkaListenerContainerFactory")
     @Transactional
     public void handlePaymentEvent(PaymentEvent event) {
         if (!"PAYMENT_SUCCESS".equals(event.getEventType())) {
@@ -221,12 +223,114 @@ public class EscrowService {
 
     // ─── Kafka Consumer: Dispute Events ────────────────────────────────────────────
 
-    @KafkaListener(topics = "dispute-events", groupId = "escrow-dispute-group")
+    @KafkaListener(topics = "dispute-events", groupId = "escrow-dispute-group",
+            containerFactory = "disputeEventKafkaListenerContainerFactory")
     @Transactional
-    public void handleDisputeEvent(String eventPayload) {
-        // Simplified: In full implementation, deserialize to DisputeEvent DTO
-        // and freeze/release based on DISPUTE_CREATED / DISPUTE_RESOLVED
-        log.info("Received dispute event (placeholder processing): {}", eventPayload);
+    public void handleDisputeEvent(DisputeEvent event) {
+        if (event == null || event.getEventType() == null || event.getMilestoneId() == null) {
+            log.warn("Received null or incomplete dispute event, skipping");
+            return;
+        }
+
+        log.info("Received dispute event {} for milestone {}", event.getEventType(), event.getMilestoneId());
+
+        switch (event.getEventType()) {
+            case "DISPUTE_CREATED" -> handleDisputeCreated(event);
+            case "DISPUTE_RESOLVED" -> handleDisputeResolved(event);
+            default -> log.info("Unhandled dispute event type: {}", event.getEventType());
+        }
+    }
+
+    private void handleDisputeCreated(DisputeEvent event) {
+        escrowRepository.findByMilestoneId(event.getMilestoneId()).ifPresentOrElse(
+                escrow -> {
+                    if (escrow.getStatus() != EscrowStatus.FUNDED) {
+                        log.info("Escrow for milestone {} is in state {}, cannot freeze for dispute",
+                                event.getMilestoneId(), escrow.getStatus());
+                        return;
+                    }
+
+                    String idempotencyKey = "freeze:dispute:" + event.getDisputeId();
+                    if (transactionRepository.findByIdempotencyKey(idempotencyKey).isPresent()) {
+                        log.info("Dispute freeze already processed for disputeId {}", event.getDisputeId());
+                        return;
+                    }
+
+                    String lockKey = LOCK_PREFIX + escrow.getId();
+                    if (!acquireLock(lockKey)) {
+                        log.error("Could not acquire lock to freeze escrow {} for dispute {}", escrow.getId(), event.getDisputeId());
+                        return;
+                    }
+                    try {
+                        EscrowStatus fromStatus = escrow.getStatus();
+                        escrow.setStatus(EscrowStatus.FROZEN);
+                        Escrow saved = escrowRepository.save(escrow);
+
+                        recordTransaction(saved, fromStatus, EscrowStatus.FROZEN,
+                                event.getInitiatorId(), "SYSTEM",
+                                "Dispute opened (id=" + event.getDisputeId() + ") - funds frozen",
+                                idempotencyKey);
+                        publishEvent(saved, "ESCROW_FROZEN");
+                        log.info("Escrow {} frozen due to dispute {}", saved.getId(), event.getDisputeId());
+                    } finally {
+                        releaseLock(lockKey);
+                    }
+                },
+                () -> log.warn("No escrow found for milestone {} on DISPUTE_CREATED", event.getMilestoneId())
+        );
+    }
+
+    private void handleDisputeResolved(DisputeEvent event) {
+        escrowRepository.findByMilestoneId(event.getMilestoneId()).ifPresentOrElse(
+                escrow -> {
+                    if (escrow.getStatus() != EscrowStatus.FROZEN) {
+                        log.info("Escrow for milestone {} is in state {}, no action needed on DISPUTE_RESOLVED",
+                                event.getMilestoneId(), escrow.getStatus());
+                        return;
+                    }
+
+                    String resolutionStatus = event.getResolutionStatus();
+                    if (resolutionStatus == null) {
+                        log.warn("DISPUTE_RESOLVED event missing resolutionStatus for dispute {}", event.getDisputeId());
+                        return;
+                    }
+
+                    String idempotencyKey = "resolve:dispute:" + event.getDisputeId();
+                    if (transactionRepository.findByIdempotencyKey(idempotencyKey).isPresent()) {
+                        log.info("Dispute resolution already processed for disputeId {}", event.getDisputeId());
+                        return;
+                    }
+
+                    String lockKey = LOCK_PREFIX + escrow.getId();
+                    if (!acquireLock(lockKey)) {
+                        log.error("Could not acquire lock to resolve escrow {} for dispute {}", escrow.getId(), event.getDisputeId());
+                        return;
+                    }
+                    try {
+                        EscrowStatus fromStatus = escrow.getStatus();
+                        // BUYER_WINS → refund buyer; SELLER_WINS → release to seller; SPLIT → release (manual split handled externally)
+                        EscrowStatus toStatus = switch (resolutionStatus) {
+                            case "BUYER_WINS" -> EscrowStatus.REFUNDED;
+                            default -> EscrowStatus.RELEASED; // SELLER_WINS or SPLIT
+                        };
+                        String reason = "Dispute " + event.getDisputeId() + " resolved: " + resolutionStatus
+                                + (event.getResolutionNotes() != null ? " — " + event.getResolutionNotes() : "");
+
+                        escrow.setStatus(toStatus);
+                        Escrow saved = escrowRepository.save(escrow);
+
+                        recordTransaction(saved, fromStatus, toStatus,
+                                event.getInitiatorId(), "ADMIN", reason, idempotencyKey);
+
+                        String kafkaEventType = toStatus == EscrowStatus.REFUNDED ? "ESCROW_REFUNDED" : "ESCROW_RELEASED";
+                        publishEvent(saved, kafkaEventType);
+                        log.info("Escrow {} {} after dispute resolution ({})", saved.getId(), toStatus, resolutionStatus);
+                    } finally {
+                        releaseLock(lockKey);
+                    }
+                },
+                () -> log.warn("No escrow found for milestone {} on DISPUTE_RESOLVED", event.getMilestoneId())
+        );
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────────

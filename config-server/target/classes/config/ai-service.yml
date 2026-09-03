@@ -1,9 +1,0 @@
-server:
-  port: 8089
-
-spring:
-  data:
-    mongodb:
-      uri: mongodb://:@:/ai_db?authSource=admin
-  kafka:
-    bootstrap-servers: 
