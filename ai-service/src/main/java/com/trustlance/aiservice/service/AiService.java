@@ -1,6 +1,6 @@
 package com.trustlance.aiservice.service;
 
-import com.trustlance.aiservice.dto.GeminiDto;
+import com.trustlance.aiservice.dto.AiVerificationDto;
 import com.trustlance.aiservice.dto.VerificationRequest;
 import com.trustlance.aiservice.event.AiVerificationEvent;
 import com.trustlance.aiservice.exception.AppException;
@@ -24,9 +24,9 @@ import java.util.UUID;
 public class AiService {
 
     private final AiVerificationRepository aiVerificationRepository;
-    private final GeminiClient geminiClient;
+    private final GroqAiClient groqAiClient;
     private final MinioService minioService;
-    private final KafkaTemplate<String, AiVerificationEvent> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     private static final String AI_EVENTS_TOPIC = "ai-events";
 
@@ -44,17 +44,17 @@ public class AiService {
         AiVerification saved = aiVerificationRepository.save(verification);
         log.info("Verification {} created for user {}, document type {}", saved.getId(), userId, request.getDocumentType());
 
-        // Trigger async Gemini AI analysis
-        processWithGemini(saved);
+        // Trigger async Groq AI analysis
+        processWithGroq(saved);
 
         return saved;
     }
 
-    // ─── Async Gemini Processing ──────────────────────────────────────────────────
+    // ─── Async Groq AI Processing ──────────────────────────────────────────────────
 
     @Async
-    public void processWithGemini(AiVerification verification) {
-        log.info("Starting Gemini AI analysis for verification {}", verification.getId());
+    public void processWithGroq(AiVerification verification) {
+        log.info("Starting Groq AI analysis for verification {}", verification.getId());
         try {
             // 1. Fetch document content from MinIO
             String documentContent;
@@ -66,21 +66,21 @@ public class AiService {
                 return;
             }
 
-            // 2. Call Gemini API
-            GeminiDto.VerificationResult result;
+            // 2. Call Groq AI API
+            AiVerificationDto.VerificationResult result;
             try {
-                result = geminiClient.analyzeDocument(
+                result = groqAiClient.analyzeDocument(
                         verification.getDocumentType(),
                         documentContent,
                         verification.getObjectStorageRef()
                 );
             } catch (Exception e) {
-                log.error("Gemini API call failed for verification {}: {}", verification.getId(), e.getMessage());
+                log.error("Groq AI call failed for verification {}: {}", verification.getId(), e.getMessage());
                 markFailed(verification, "AI analysis failed: " + e.getMessage());
                 return;
             }
 
-            // 3. Map Gemini result to verification status
+            // 3. Map Groq AI result to verification status
             AiVerification.VerificationStatus newStatus = switch (result.getStatus()) {
                 case "APPROVED" -> AiVerification.VerificationStatus.APPROVED;
                 case "REJECTED" -> AiVerification.VerificationStatus.REJECTED;
@@ -98,7 +98,7 @@ public class AiService {
             }
 
             AiVerification saved = aiVerificationRepository.save(verification);
-            log.info("Gemini analysis complete for verification {}: status={} confidence={}",
+            log.info("Groq AI analysis complete for verification {}: status={} confidence={}",
                     saved.getId(), newStatus, result.getConfidenceScore());
 
             // 4. Publish Kafka event so user-service can mark user as verified (if APPROVED)

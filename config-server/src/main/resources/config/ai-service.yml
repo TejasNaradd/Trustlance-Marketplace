@@ -10,25 +10,75 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  
+  # ─── Spring AI Configuration for Groq ────────────────────────────────────────
+  ai:
+    openai:
+      # Groq API Key (must be set via environment variable GROQ_API_KEY)
+      api-key: ${GROQ_API_KEY:}
+      
+      # Groq base URL (OpenAI-compatible endpoint)
+      base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
+      
+      # Chat model configuration
+      chat:
+        # Groq model: llama3-70b-8192 (70B params, 8K context window)
+        model: ${GROQ_MODEL:llama3-70b-8192}
+        
+        # Generation options
+        options:
+          # Low temperature for consistent, factual document analysis
+          temperature: ${GROQ_TEMPERATURE:0.1}
+          
+          # Max tokens for response (sufficient for JSON verification result)
+          max-tokens: ${GROQ_MAX_TOKENS:1024}
+          
+          # Top-p sampling (nucleus sampling) - deterministic for verification
+          top-p: ${GROQ_TOP_P:0.95}
 
+# ─── TrustLance Custom Configuration ──────────────────────────────────────────
 trustlance:
   jwt:
     secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-  ai:
-    gemini:
-      api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_MODEL:gemini-2.5-flash}
-      base-url: https://generativelanguage.googleapis.com/v1beta/models
+  
+  # MinIO Object Storage
   minio:
     endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
     access-key: ${MINIO_ACCESS_KEY:minioadmin}
     secret-key: ${MINIO_SECRET_KEY:minioadmin}
     bucket: ${MINIO_BUCKET:trustlance-documents}
+  
+  # AI Service specific settings
+  ai:
+    verification:
+      # Async thread pool size for AI processing
+      async-executor:
+        core-pool-size: ${AI_ASYNC_CORE_POOL:5}
+        max-pool-size: ${AI_ASYNC_MAX_POOL:10}
+        queue-capacity: ${AI_ASYNC_QUEUE:50}
+      
+      # Confidence thresholds for decision-making
+      confidence:
+        auto-approve-threshold: ${AI_CONFIDENCE_AUTO_APPROVE:0.90}
+        manual-review-threshold: ${AI_CONFIDENCE_MANUAL_REVIEW:0.70}
 
+# ─── Logging ──────────────────────────────────────────────────────────────────
 logging:
   level:
-    com.trustlance.aiservice: INFO
+    com.trustlance.aiservice: ${LOG_LEVEL:INFO}
+    org.springframework.ai: ${SPRING_AI_LOG_LEVEL:DEBUG}
 
+# ─── Actuator & Monitoring ────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# ─── API Documentation ────────────────────────────────────────────────────────
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

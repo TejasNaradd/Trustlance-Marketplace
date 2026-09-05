@@ -13,7 +13,7 @@ import java.util.UUID;
 @Slf4j
 public class MarketplaceEventPublisher {
 
-    private final KafkaTemplate<String, MarketplaceEvent> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     private static final String MARKETPLACE_EVENTS_TOPIC = "marketplace-events";
 

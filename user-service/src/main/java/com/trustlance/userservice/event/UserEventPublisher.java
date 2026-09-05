@@ -13,7 +13,7 @@ import java.util.UUID;
 @Slf4j
 public class UserEventPublisher {
 
-    private final KafkaTemplate<String, UserEvent> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     private static final String USER_EVENTS_TOPIC = "user-events";
 

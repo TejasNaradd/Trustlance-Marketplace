@@ -23,7 +23,7 @@ import java.util.UUID;
 public class ReviewService {
 
     private final ReviewRepository reviewRepository;
-    private final KafkaTemplate<String, ReviewEvent> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     private static final String REVIEW_EVENTS_TOPIC = "review-events";
 

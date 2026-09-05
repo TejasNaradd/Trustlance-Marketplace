@@ -19,7 +19,7 @@ import java.util.UUID;
 @Slf4j
 public class ContractEventPublisher {
 
-    private final KafkaTemplate<String, ContractEvent> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     private static final String CONTRACT_EVENTS_TOPIC = "contract-events";
 

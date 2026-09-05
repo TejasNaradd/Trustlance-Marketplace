@@ -37,7 +37,7 @@ public class PaymentService {
 
     private final PaymentIntentRepository paymentIntentRepository;
     private final WebhookEventRepository webhookEventRepository;
-    private final KafkaTemplate<String, PaymentEvent> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
     private final List<PaymentProvider> providers;
 
     private static final String PAYMENT_EVENTS_TOPIC = "payment-events";

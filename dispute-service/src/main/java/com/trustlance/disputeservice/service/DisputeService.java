@@ -27,7 +27,7 @@ import java.util.UUID;
 public class DisputeService {
 
     private final DisputeRepository disputeRepository;
-    private final KafkaTemplate<String, DisputeEvent> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     private static final String DISPUTE_EVENTS_TOPIC = "dispute-events";
 

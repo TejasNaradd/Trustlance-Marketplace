@@ -5,14 +5,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.scheduling.annotation.EnableAsync;
-
-import com.trustlance.aiservice.config.GeminiProperties;
 import com.trustlance.aiservice.config.MinioProperties;
 
 @SpringBootApplication
 @EnableDiscoveryClient
 @EnableAsync
-@EnableConfigurationProperties({GeminiProperties.class, MinioProperties.class})
+@EnableConfigurationProperties(MinioProperties.class)
 public class AiServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(AiServiceApplication.class, args);

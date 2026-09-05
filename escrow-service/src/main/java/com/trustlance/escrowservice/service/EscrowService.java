@@ -34,7 +34,7 @@ public class EscrowService {
 
     private final EscrowRepository escrowRepository;
     private final EscrowTransactionRepository transactionRepository;
-    private final KafkaTemplate<String, EscrowEvent> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
     private final StringRedisTemplate redisTemplate;
 
     private static final String ESCROW_EVENTS_TOPIC = "escrow-events";
