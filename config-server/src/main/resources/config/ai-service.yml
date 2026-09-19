@@ -78,6 +78,9 @@ management:
     health:
       show-details: when-authorized
 
+gateway:
+  url: ${GATEWAY_URL:http://localhost:8080}
+
 # ─── API Documentation ────────────────────────────────────────────────────────
 springdoc:
   swagger-ui:

@@ -24,8 +24,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -123,23 +121,23 @@ public class PaymentService {
                 .build();
         webhookEventRepository.save(webhookEvent);
 
-        // 5. Update payment intent state
+        // 5. Update payment intent state — look up by providerOrderId which was set at createOrder time
         try {
-            paymentIntentRepository.findByMilestoneIdAndStatus(UUID.randomUUID(), PaymentStatus.PENDING)
-                    .ifPresent(intent -> {
+            paymentIntentRepository.findByProviderOrderId(eventData.providerEventId())
+                    .ifPresentOrElse(intent -> {
                         if (eventData.isSuccess()) {
                             intent.setStatus(PaymentStatus.SUCCESS);
                             intent.setProviderPaymentId(eventData.providerPaymentId());
                             paymentIntentRepository.save(intent);
 
-                            // 6. Publish Kafka event — PAYMENT_SUCCESS
+                            // 6. Publish Kafka event — PAYMENT_SUCCESS → escrow-service locks funds
                             publishPaymentEvent(intent, "PAYMENT_SUCCESS", null);
                         } else {
                             intent.setStatus(PaymentStatus.FAILED);
                             paymentIntentRepository.save(intent);
                             publishPaymentEvent(intent, "PAYMENT_FAILED", "Provider reported failure");
                         }
-                    });
+                    }, () -> log.warn("No PaymentIntent found for providerOrderId={}", eventData.providerEventId()));
 
             webhookEvent.setProcessed(true);
             webhookEvent.setProcessedAt(Instant.now());

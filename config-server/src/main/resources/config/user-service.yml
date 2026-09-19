@@ -34,6 +34,9 @@ logging:
   level:
     com.trustlance.userservice: INFO
 
+gateway:
+  url: ${GATEWAY_URL:http://localhost:8080}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

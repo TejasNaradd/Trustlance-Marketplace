@@ -18,4 +18,6 @@ public interface PaymentIntentRepository extends JpaRepository<PaymentIntent, UU
     Page<PaymentIntent> findByBuyerId(UUID buyerId, Pageable pageable);
 
     Optional<PaymentIntent> findByMilestoneIdAndStatus(UUID milestoneId, PaymentStatus status);
+
+    Optional<PaymentIntent> findByProviderOrderId(String providerOrderId);
 }
