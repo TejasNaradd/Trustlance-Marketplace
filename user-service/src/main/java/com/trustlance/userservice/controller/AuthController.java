@@ -1,11 +1,13 @@
 package com.trustlance.userservice.controller;
 
+import com.trustlance.userservice.config.UserPrincipal;
 import com.trustlance.userservice.dto.*;
 import com.trustlance.userservice.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -36,9 +38,9 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestHeader(value = "X-User-Id", required = false) String userId) {
-        if (userId != null) {
-            authService.logout(userId);
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal UserPrincipal principal) {
+        if (principal != null) {
+            authService.logout(principal.getId().toString());
         }
         return ResponseEntity.noContent().build();
     }
